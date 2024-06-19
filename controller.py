@@ -28,6 +28,22 @@ def vmap(R):
         rz = R[1, 0] - R[0, 1]
         omega = theta / (2 * np.sin(theta)) * np.array([rx, ry, rz])
         return omega
+    
+def hat(omega):
+    """
+    Compute the hat operator of a 3D vector.
+    
+    Args:
+        omega (numpy.ndarray): 3x1 or 1x3 vector
+    
+    Returns:
+        numpy.ndarray: 3x3 skew-symmetric matrix
+    """
+    omega = omega.flatten()  # Ensure omega is a 1D array
+    return np.array([[0, -omega[2], omega[1]],
+                     [omega[2], 0, -omega[0]],
+                     [-omega[1], omega[0], 0]])
+
 
 class SE3Control(object):
     def __init__(self, params):
@@ -51,7 +67,7 @@ class SE3Control(object):
         self.KR = np.ones((3,3))
         self.KOmega = np.ones((3,3))
 
-    def update(self, state, desired_state):
+    def update(self, dt, state, desired_state):
         
         ## Track position and velocity error
         ex = state['x'] - desired_state['x']  ## position error
@@ -71,6 +87,21 @@ class SE3Control(object):
         Rd = np.vstack(b1d, b2d, b3d)  ## desired attitude as a orthogonal group in SO(3)
 
         ## Tracking rotation and angular velocity error
-        R = Rotation.from_quat(state['q']).as_matrix()  ## current rotation
+        R = Rotation.from_matrix(state['R']).as_matrix()  ## current rotation
         eR = 0.5 * vmap(Rd @ R - R @ Rd)
-        eOmega = np.zeros(3)  ## desired angular velocity is 0, so the equation (omega - R @ Rd @ Omegad) == 0
+        eOmega = state['omega']  ## desired angular velocity is 0, so the equation (omega - R @ Rd @ Omegad) == 0
+
+        ## Find control inputs and update dynamics
+        f = (-self.Kx*ex - self.Kv*ev - self.mass*self.g*self.e3) + self.mass*desired_state['x_ddot']  ## total thrust
+        M = -self.KR*eR - self.KOmega*eOmega + np.cross(state['omega'], self.inertia*state['omega'])  ## control moment
+
+        x = state['x'] + state['x_dot'] * dt
+        v = state['x_dot'] + ((1/self.mass)*(self.mass*self.g*self.e3 - f*R*self.e3)) * dt
+        orientation = R + (R @ hat(state['omega'])) * dt
+        angular_velocity = state['omega'] + np.linalg.inv(self.inertia) @ (M - np.cross(state['omega'], self.inertia@state['omega'])) * dt
+
+        state = {'x': x,
+                 'x_dot': v,
+                 'R': orientation,
+                 'omega': angular_velocity}
+        return state
