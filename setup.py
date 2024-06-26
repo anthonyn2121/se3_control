@@ -8,10 +8,10 @@ submodule_path = os.path.join(os.path.dirname(__file__), 'environment_toolkit')
 sys.path.append(submodule_path)
 
 # Get the absolute path of the 'environment_toolkit' submodule
-submodule_path = os.path.join(os.path.dirname(__file__), 'a_star')
+# submodule_path = os.path.join(os.path.dirname(__file__), 'a_star')
 
 # Add the submodule's path to the Python path
-sys.path.append(submodule_path)
+# sys.path.append(submodule_path)
 
 # Get the absolute path of the 'environment_toolkit' submodule
 submodule_path = os.path.join(os.path.dirname(__file__), 'trajectory_generation')

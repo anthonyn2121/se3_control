@@ -78,16 +78,20 @@ class SE3Control(object):
 
         b3d = -(self.Kx*ex) - (self.Kv*ev) - (self.mass*self.g*self.e3) + (self.mass*desired_state['x_ddot'])
         b3d /= (np.linalg.norm(b3d) + 0.0001)
+        print("b3d: \n", b3d)
 
         b2d = np.cross(b3d, b1d)
         b2d /= np.linalg.norm(b2d)
+        print("b2d: \n", b2d)
 
         b1d = np.cross(b2d, b3d)
+        print("b1d: \n", b1d)
 
-        Rd = np.vstack(b1d, b2d, b3d)  ## desired attitude as a orthogonal group in SO(3)
-
+        Rd = np.vstack((b1d, b2d, b3d))  ## desired attitude as a orthogonal group in SO(3)
+        print("Rd: \n", Rd)
         ## Tracking rotation and angular velocity error
         R = Rotation.from_matrix(state['R']).as_matrix()  ## current rotation
+        print("R.shape: \n", R.shape)
         eR = 0.5 * vmap(Rd @ R - R @ Rd)
         eOmega = state['omega']  ## desired angular velocity is 0, so the equation (omega - R @ Rd @ Omegad) == 0
 
@@ -96,12 +100,12 @@ class SE3Control(object):
         M = -self.KR*eR - self.KOmega*eOmega + np.cross(state['omega'], self.inertia*state['omega'])  ## control moment
 
         x = state['x'] + state['x_dot'] * dt
-        v = state['x_dot'] + ((1/self.mass)*(self.mass*self.g*self.e3 - f*R*self.e3)) * dt
+        v = state['x_dot'] + ((1/self.mass)*(self.mass*self.g*self.e3 - f*R@self.e3)) * dt
         orientation = R + (R @ hat(state['omega'])) * dt
         angular_velocity = state['omega'] + np.linalg.inv(self.inertia) @ (M - np.cross(state['omega'], self.inertia@state['omega'])) * dt
 
-        state = {'x': x,
-                 'x_dot': v,
-                 'R': orientation,
-                 'omega': angular_velocity}
+        state = {'x': x.reshape((1, 3)),
+                 'x_dot': v.reshape((1, 3)),
+                 'R': orientation.reshape((3, 3)),
+                 'omega': angular_velocity.reshape((3, 3))}
         return state
